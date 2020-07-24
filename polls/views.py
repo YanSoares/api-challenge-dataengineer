@@ -9,10 +9,11 @@ from .models import Vendas
 import csv
 import datetime
 import pandas as pd
+import re
 
 def index(request):
-    return render(request, 'polls/index.html')
- 
+    return HttpResponseRedirect('/vendas')
+
 class VendasFilter(filters.FilterSet):
 
     date_gte = filters.DateFilter(field_name="data", lookup_expr='gte')
@@ -36,6 +37,7 @@ class VendasDetail(generics.RetrieveAPIView):
 
 
 def insert(request, id):
+    #1 - csv, 2 - xlxs, 3 - txt, 4 - html
     if id==1:
         with open('polls/data/VENDAS_20190519.csv') as f:
             reader = csv.reader(f)
@@ -64,4 +66,38 @@ def insert(request, id):
                 )
             if created:
                 obj.save()
+    if id==3:
+        regex = r"(\d{2}.\d{2}.\d{4})\|(\d*)\s*\|(\d*)\s*\|(\d*)\s*\|\s*(\d*)"
+        with open('polls/data/VENDAS_20190523.txt', encoding="utf8", errors='ignore') as f:
+            for linha in f:
+                x = re.search(regex, linha)
+                if x:
+                    row = linha.split('|')
+                    d = datetime.datetime.strptime(row[1], '%d.%m.%Y').date()
+                    obj, created = Vendas.objects.get_or_create(
+                        data = d,
+                        escrv = int(row[2].strip()),
+                        material = int(row[3].strip()),
+                        grp_merc = int(row[4].strip()),
+                        qtd_faturad = row[5].strip(),
+                        )
+                    if created:
+                        obj.save()                    
+                    
+    if id==4:
+        df = pd.read_html('polls/data/VENDAS_20200524_20200525.html')
+        df = df[0]
+        for index, row in df.iterrows():
+            d = datetime.datetime.strptime(str(row['data']), '%d.%m.%Y').date()
+            obj, created = Vendas.objects.get_or_create(
+                data = d,
+                escrv = int(str(row['escrv']).strip()),
+                material = int(str(row['material']).strip()),
+                grp_merc = int(str(row['grp.merc.']).strip()),
+                qtd_faturad = str(row['qtd.faturd']).strip(),
+                )
+            if created:
+                obj.save()
+                    
+        
     return HttpResponseRedirect('/vendas')
